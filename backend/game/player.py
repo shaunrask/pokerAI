@@ -1,10 +1,11 @@
 class Player:
-    def __init__(self, name):
+    def __init__(self, name, is_bot = False):
         self.name = name
         self.hand = []
         self.chips = 100
         self.bet = 0
         self.folded = False
+        self.is_bot = is_bot
 
     def __str__(self):
         return f"{self.name} ({self.chips} chips)"
