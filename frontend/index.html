@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Poker AI Test UI</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    button { margin: 5px; }
+    pre { background: #f0f0f0; padding: 10px; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <h1>🃏 Poker AI Test Interface</h1>
+
+  <button onclick="startNewHand()">Start New Hand</button>
+  <button onclick="sendAction('check')">Check</button>
+  <button onclick="sendAction('bet')">Bet 50</button>
+  <button onclick="sendAction('fold')">Fold</button>
+  <button onclick="nextStage()">Next Stage</button>
+  <button onclick="refreshState()">Refresh State</button>
+
+  <h3>Game State</h3>
+  <pre id="gameState">Loading...</pre>
+
+  <script>
+    const API_BASE = "http://localhost:5000";
+
+    function updateGameState(data) {
+      document.getElementById("gameState").textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function startNewHand() {
+      await fetch(`${API_BASE}/new_hand`);
+      refreshState();
+    }
+
+    async function sendAction(action) {
+      const res = await fetch(`${API_BASE}/player_action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action === "bet" ? { action, amount: 50 } : { action })
+      });
+      const result = await res.json();
+      console.log(result);
+      refreshState();
+    }
+
+    async function nextStage() {
+      await fetch(`${API_BASE}/next_stage`, { method: "POST" });
+      refreshState();
+    }
+
+    async function refreshState() {
+      const res = await fetch(`${API_BASE}/get_state`);
+      const data = await res.json();
+      updateGameState(data);
+    }
+
+    refreshState();
+  </script>
+</body>
+</html>

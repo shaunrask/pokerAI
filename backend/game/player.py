@@ -2,8 +2,8 @@ class Player:
     def __init__(self, name, is_bot = False):
         self.name = name
         self.hand = []
-        self.chips = 100
-        self.bet = 0
+        self.chips = 1000
+        self.current_bet = 0
         self.folded = False
         self.is_bot = is_bot
 
@@ -21,7 +21,7 @@ class Player:
 
     def bet_chips(self, chips):
         self.chips -= chips
-        self.bet += chips
+        self.current_bet += chips
 
     def fold(self):
         self.folded = True
