@@ -6,65 +6,120 @@ from game.player import Player
 app = Flask(__name__)
 CORS(app)
 
-#Initialize table with 1 user and 1 bots
-players = [Player("You"), Player("Bot1", is_bot=True)]
+def create_players(num_players=4):
+    """Create a list of players with one human and the rest bots"""
+    players = [Player("You", chips=1000)]
+    
+    # Add bots
+    for i in range(1, num_players):
+        players.append(Player(f"Bot{i}", is_bot=True, chips=1000))
+    
+    return players
+
+# Initialize table with multiple players (default 4)
+players = create_players(4)
 table = Table(players)
+
+# Add a new endpoint to get player positions
+@app.route('/player_positions', methods=['GET'])
+def get_player_positions():
+    num_players = len(table.players)
+    positions = []
+    
+    for i in range(num_players):
+        # Calculate position around the table
+        # 0 degrees is bottom center, moving clockwise
+        angle = (360 / num_players * i - 90) % 360  # Start from bottom
+        
+        positions.append({
+            "player": table.players[i].name,
+            "angle": angle,
+            "is_bot": table.players[i].is_bot,
+            "seat": i
+        })
+    
+    return jsonify(positions)
 
 @app.route('/')
 def home():
     return "Poker AI API is running!"
 
-@app.route('/new_hand')
+@app.route('/new_hand', methods=['POST'])
 def new_hand():
     table.reset()
-    table.deal_player_cards()
-    return jsonify({
-        "your_hand": [str(card) for card in players[0].hand],
-    })
+    
+    # Get game state after reset
+    state = table.get_state()
+    
+    # If first turn is a bot, make the bot move
+    if table.players[table.turn_index].is_bot:
+        bot_result = table.make_bot_move()
+        state["bot_action"] = bot_result
+        
+    return jsonify(state)
 
 @app.route('/player_action', methods=['POST'])
 def player_action():
     data = request.get_json()
-    action = data.get('action')     # e.g., "check", "bet", "fold"
+    action = data.get('action')  # e.g., "check", "call", "bet", "fold"
     amount = data.get('amount', 0)  # default to 0 if not provided
-
+    
+    # Handle player's action
     result = table.handle_player_action(action, amount)
+    result["game_state"] = table.get_state()
     
     # Let bots take turns if it's their turn
-    while table.players[table.turn_index].is_bot:
+    bot_actions = []
+    while table.players[table.turn_index].is_bot and not table.round_complete:
         bot_result = table.make_bot_move()
-        result["bot_action"] = bot_result
-
+        bot_actions.append(bot_result)
+    
+    if bot_actions:
+        result["bot_actions"] = bot_actions
+    
+    # If betting round is complete, include that in result
+    if table.round_complete:
+        result["round_complete"] = True
+    
     return jsonify(result)
 
-def make_bots_move(self):
-    while table.players[table.turn_index].is_bot:
-        bot_result = table.make_bot_move()
-        
 @app.route('/get_state', methods=['GET'])
 def get_state():
     return jsonify(table.get_state())
 
 @app.route('/next_stage', methods=['POST'])
 def next_stage():
-    if table.stage == "preflop":
-        table.deal_flop()
-        table.stage = "flop"
-    elif table.stage == "flop":
-        table.deal_turn_river()
-        table.stage = "turn"
-    elif table.stage == "turn":
-        table.deal_turn_river()
-        table.stage = "river"
-    elif table.stage == "river":
-        table.stage = "showdown"
-        # Call your evaluator here once built
-
-    return jsonify({
-        "stage": table.stage,
-        "shown_cards": [str(card) for card in table.shown_cards]
-    })
-
+    # Only advance stage if the current betting round is complete
+    if not table.round_complete and table.stage != "showdown":
+        return jsonify({
+            "status": "error",
+            "message": "Cannot advance stage until betting round is complete"
+        })
+    
+    # Handle showdown separately
+    if table.stage == "showdown":
+        winner_info = table.award_pot()
+        return jsonify({
+            "status": "game_over",
+            "winner": winner_info
+        })
+    
+    # Advance to next stage (flop, turn, river)
+    result = table.advance_stage()
+    
+    # Let bots play if first to act
+    bot_actions = []
+    while table.players[table.turn_index].is_bot and not table.round_complete:
+        bot_result = table.make_bot_move()
+        bot_actions.append(bot_result)
+    
+    if bot_actions:
+        result["bot_actions"] = bot_actions
+    
+    # Include full game state
+    result["game_state"] = table.get_state()
+    
+    return jsonify(result)
 
 if __name__ == "__main__":
     app.run(debug=True)

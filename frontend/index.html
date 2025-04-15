@@ -2,61 +2,581 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Poker AI Test UI</title>
+  <title>Poker AI Game</title>
   <style>
-    body { font-family: Arial; padding: 20px; }
-    button { margin: 5px; }
-    pre { background: #f0f0f0; padding: 10px; border-radius: 5px; }
+    body { 
+      font-family: Arial; 
+      padding: 20px; 
+      background-color: #f0f0f0;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .game-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .table {
+      background-color: #076324;
+      border-radius: 50%;  /* Make it perfectly circular */
+      padding: 30px;
+      position: relative;
+      width: 800px;
+      height: 800px;
+      margin: 0 auto;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+      color: white;
+    }
+    
+    .community-cards {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin: 20px 0;
+    }
+    
+    .player {
+      position: absolute;
+      background-color: rgba(0,0,0,0.3);
+      border-radius: 10px;
+      padding: 15px;
+      width: 200px;
+      text-align: center;
+      transform: translate(-50%, -50%);  /* Center the player div */
+    }
+    
+    .player.active {
+      box-shadow: 0 0 10px 5px gold;
+    }
+    
+    .player.folded {
+      opacity: 0.6;
+    }
+    
+    .pot {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(0,0,0,0.5);
+      padding: 15px;
+      border-radius: 10px;
+      text-align: center;
+    }
+    
+    .card {
+      display: inline-block;
+      width: 60px;
+      height: 90px;
+      background-color: white;
+      border-radius: 5px;
+      padding: 5px;
+      color: black;
+      text-align: center;
+      font-size: 24px;
+      font-weight: bold;
+      margin: 0 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    
+    .card.red {
+      color: red;
+    }
+    
+    .card.hidden {
+      background-color: #1a6fda;
+      color: #1a6fda;
+    }
+    
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    
+    button {
+      padding: 12px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      background-color: #3498db;
+      color: white;
+      transition: background-color 0.3s;
+    }
+    
+    button:hover {
+      background-color: #2980b9;
+    }
+    
+    button:disabled {
+      background-color: #95a5a6;
+      cursor: not-allowed;
+    }
+    
+    .bet-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    input[type="number"] {
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      width: 100px;
+    }
+    
+    .game-log {
+      background-color: white;
+      border-radius: 10px;
+      padding: 15px;
+      margin-top: 20px;
+      height: 150px;
+      overflow-y: auto;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .log-entry {
+      margin: 5px 0;
+      font-size: 14px;
+    }
+    
+    .dealer-button {
+      display: inline-block;
+      background-color: white;
+      color: black;
+      border-radius: 50%;
+      width: 25px;
+      height: 25px;
+      text-align: center;
+      line-height: 25px;
+      font-weight: bold;
+      margin-left: 10px;
+    }
   </style>
 </head>
 <body>
-  <h1>🃏 Poker AI Test Interface</h1>
-
-  <button onclick="startNewHand()">Start New Hand</button>
-  <button onclick="sendAction('check')">Check</button>
-  <button onclick="sendAction('bet')">Bet 50</button>
-  <button onclick="sendAction('fold')">Fold</button>
-  <button onclick="nextStage()">Next Stage</button>
-  <button onclick="refreshState()">Refresh State</button>
-
-  <h3>Game State</h3>
-  <pre id="gameState">Loading...</pre>
-
+  <div class="game-container">
+    <h1>🃏 Texas Hold'em Poker</h1>
+    
+    <div class="table" id="pokerTable">
+      <div class="pot" id="pot">
+        Pot: $0
+      </div>
+      
+      <div class="community-cards" id="communityCards">
+        <!-- Community cards will be inserted here -->
+      </div>
+      
+      <div id="playersContainer">
+        <!-- Players will be inserted here dynamically -->
+      </div>
+    </div>
+    
+    <div class="controls">
+      <button id="foldBtn">Fold</button>
+      <button id="checkBtn">Check</button>
+      <button id="callBtn">Call</button>
+      
+      <div class="bet-controls">
+        <input type="number" id="betAmount" min="0" step="25" value="50">
+        <button id="betBtn">Bet/Raise</button>
+      </div>
+      
+      <button id="newHandBtn">New Hand</button>
+      <button id="nextStageBtn" disabled>Next Stage</button>
+    </div>
+    
+    <div class="game-log" id="gameLog">
+      <div class="log-entry">Welcome to Poker! Press 'New Hand' to begin.</div>
+    </div>
+  </div>
+  
   <script>
     const API_BASE = "http://localhost:5000";
-
-    function updateGameState(data) {
-      document.getElementById("gameState").textContent = JSON.stringify(data, null, 2);
-    }
-
+    let gameState = null;
+    
+    // HTML Elements
+    const opponentEl = document.getElementById('opponent');
+    const playerEl = document.getElementById('player');
+    const potEl = document.getElementById('pot');
+    const communityCardsEl = document.getElementById('communityCards');
+    const opponentCardsEl = document.getElementById('opponentCards');
+    const playerCardsEl = document.getElementById('playerCards');
+    const gameLogEl = document.getElementById('gameLog');
+    
+    // Buttons
+    const foldBtn = document.getElementById('foldBtn');
+    const checkBtn = document.getElementById('checkBtn');
+    const callBtn = document.getElementById('callBtn');
+    const betBtn = document.getElementById('betBtn');
+    const betAmountInput = document.getElementById('betAmount');
+    const newHandBtn = document.getElementById('newHandBtn');
+    const nextStageBtn = document.getElementById('nextStageBtn');
+    
+    // Disable action buttons initially
+    toggleActionButtons(false);
+    
+    // Add event listeners
+    foldBtn.addEventListener('click', () => sendAction('fold'));
+    checkBtn.addEventListener('click', () => sendAction('check'));
+    callBtn.addEventListener('click', () => sendAction('call'));
+    betBtn.addEventListener('click', () => sendAction('bet', parseInt(betAmountInput.value)));
+    newHandBtn.addEventListener('click', startNewHand);
+    nextStageBtn.addEventListener('click', nextStage);
+    
     async function startNewHand() {
-      await fetch(`${API_BASE}/new_hand`);
-      refreshState();
+      try {
+        const res = await fetch(`${API_BASE}/new_hand`, { method: 'POST' });
+        gameState = await res.json();
+        updateUI();
+        logMessage('New hand dealt');
+        
+        if (gameState.players[gameState.turn_index].name === "You") {
+          toggleActionButtons(true);
+          nextStageBtn.disabled = true;
+        } else {
+          toggleActionButtons(false);
+        }
+        
+      } catch (error) {
+        console.error('Error starting new hand:', error);
+        logMessage('Error: Could not start new hand. Is the server running?');
+      }
     }
-
-    async function sendAction(action) {
-      const res = await fetch(`${API_BASE}/player_action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(action === "bet" ? { action, amount: 50 } : { action })
-      });
-      const result = await res.json();
-      console.log(result);
-      refreshState();
+    
+    async function sendAction(action, amount = 0) {
+      try {
+        const res = await fetch(`${API_BASE}/player_action`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({action, amount})
+        });
+        
+        const result = await res.json();
+        console.log('Action result:', result);
+        
+        if (result.status === 'error') {
+          logMessage(`Error: ${result.message}`);
+          return;
+        }
+        
+        // Log player action
+        if (action === 'fold') {
+          logMessage('You folded');
+        } else if (action === 'check') {
+          logMessage('You checked');
+        } else if (action === 'call') {
+          logMessage(`You called $${result.amount}`);
+        } else if (action === 'bet') {
+          logMessage(`You bet $${amount}`);
+        }
+        
+        // Log bot actions if any
+        if (result.bot_actions) {
+          result.bot_actions.forEach(action => {
+            if (action.status === 'folded') {
+              logMessage('Bot folded');
+            } else if (action.status === 'checked') {
+              logMessage('Bot checked');
+            } else if (action.status === 'called') {
+              logMessage(`Bot called $${action.amount}`);
+            } else if (action.status === 'bet') {
+              logMessage(`Bot bet $${action.amount}`);
+            }
+          });
+        }
+        
+        // Update game state
+        if (result.game_state) {
+          gameState = result.game_state;
+        }
+        
+        updateUI();
+        
+        // Enable/disable buttons based on round completion
+        if (result.round_complete || gameState.round_complete) {
+          toggleActionButtons(false);
+          nextStageBtn.disabled = false;
+          logMessage('Betting round complete. Click "Next Stage" to continue.');
+        } else if (gameState.players[gameState.turn_index].name === "You") {
+          toggleActionButtons(true);
+        } else {
+          toggleActionButtons(false);
+        }
+        
+      } catch (error) {
+        console.error('Error sending action:', error);
+        logMessage('Error: Could not process action. Is the server running?');
+      }
     }
-
+    
     async function nextStage() {
-      await fetch(`${API_BASE}/next_stage`, { method: "POST" });
-      refreshState();
+      try {
+        const res = await fetch(`${API_BASE}/next_stage`, { method: 'POST' });
+        const result = await res.json();
+        console.log('Next stage result:', result);
+        
+        if (result.status === 'error') {
+          logMessage(`Error: ${result.message}`);
+          return;
+        }
+        
+        // Handle showdown and game over
+        if (result.status === 'game_over') {
+          logMessage(`Game over! Winner: ${result.winner.winner}, won $${result.winner.chips_won}`);
+          gameState = null;
+          nextStageBtn.disabled = true;
+          return;
+        }
+        
+        // Log stage advancement
+        if (result.community_cards) {
+          const stage = result.status === 'new_betting_round' ? result.stage : 'next stage';
+          logMessage(`Advanced to ${stage}: ${result.community_cards.join(', ')}`);
+        }
+        
+        // Log bot actions if any
+        if (result.bot_actions) {
+          result.bot_actions.forEach(action => {
+            if (action.status === 'folded') {
+              logMessage('Bot folded');
+            } else if (action.status === 'checked') {
+              logMessage('Bot checked');
+            } else if (action.status === 'called') {
+              logMessage(`Bot called $${action.amount}`);
+            } else if (action.status === 'bet') {
+              logMessage(`Bot bet $${action.amount}`);
+            }
+          });
+        }
+        
+        // Update game state
+        if (result.game_state) {
+          gameState = result.game_state;
+          updateUI();
+          
+          // Enable player controls if it's their turn
+          if (gameState.players[gameState.turn_index].name === "You") {
+            toggleActionButtons(true);
+            nextStageBtn.disabled = true;
+          } else {
+            toggleActionButtons(false);
+          }
+        }
+        
+      } catch (error) {
+        console.error('Error advancing stage:', error);
+        logMessage('Error: Could not advance stage. Is the server running?');
+      }
     }
-
-    async function refreshState() {
-      const res = await fetch(`${API_BASE}/get_state`);
-      const data = await res.json();
-      updateGameState(data);
+    
+    function updateUI() {
+      if (!gameState) return;
+      
+      positionPlayers();
+      
+      // Update pot
+      potEl.textContent = `Pot: $${gameState.pot}`;
+      
+      // Update community cards
+      communityCardsEl.innerHTML = '';
+      gameState.shown_cards.forEach(card => {
+        const cardEl = createCardElement(card);
+        communityCardsEl.appendChild(cardEl);
+      });
+      
+      // Update player info
+      const you = gameState.players.find(p => p.name === "You");
+      const bot = gameState.players.find(p => p.name === "Bot1");
+      
+      if (you) {
+        playerEl.className = `player ${you.folded ? 'folded' : ''} ${gameState.turn_index === 0 ? 'active' : ''}`;
+        playerEl.querySelector('.player-info').innerHTML = `
+          Chips: $${you.chips}<br>
+          Bet: $${you.current_bet}
+          ${gameState.dealer_index === 0 ? '<span class="dealer-button">D</span>' : ''}
+        `;
+        
+        // Update player cards
+        playerCardsEl.innerHTML = '';
+        you.hand.forEach(card => {
+          const cardEl = createCardElement(card);
+          playerCardsEl.appendChild(cardEl);
+        });
+      }
+      
+      if (bot) {
+        opponentEl.className = `player ${bot.folded ? 'folded' : ''} ${gameState.turn_index === 1 ? 'active' : ''}`;
+        opponentEl.querySelector('.player-info').innerHTML = `
+          Chips: $${bot.chips}<br>
+          Bet: $${bot.current_bet}
+          ${gameState.dealer_index === 1 ? '<span class="dealer-button">D</span>' : ''}
+        `;
+        
+        // Update bot cards - show only in showdown
+        opponentCardsEl.innerHTML = '';
+        if (gameState.stage === 'showdown') {
+          bot.hand.forEach(card => {
+            const cardEl = createCardElement(card);
+            opponentCardsEl.appendChild(cardEl);
+          });
+        } else {
+          // Show card backs
+          const card1 = document.createElement('div');
+          card1.className = 'card hidden';
+          card1.textContent = '??';
+          
+          const card2 = document.createElement('div');
+          card2.className = 'card hidden';
+          card2.textContent = '??';
+          
+          opponentCardsEl.appendChild(card1);
+          opponentCardsEl.appendChild(card2);
+        }
+      }
+      
+      // Update available actions based on game state
+      updateAvailableActions();
     }
-
-    refreshState();
+    
+    function createCardElement(cardStr) {
+      const cardEl = document.createElement('div');
+      cardEl.className = 'card';
+      
+      // Add color class for hearts and diamonds
+      if (cardStr.includes('h') || cardStr.includes('d')) {
+        cardEl.classList.add('red');
+      }
+      
+      // Format card display
+      const rank = cardStr[0];
+      const suit = cardStr[1];
+      
+      // Convert suit to symbol
+      let suitSymbol = suit;
+      if (suit === 'h') suitSymbol = '♥';
+      if (suit === 'd') suitSymbol = '♦';
+      if (suit === 'c') suitSymbol = '♣';
+      if (suit === 's') suitSymbol = '♠';
+      
+      cardEl.innerHTML = `${rank}<br>${suitSymbol}`;
+      
+      return cardEl;
+    }
+    
+    function updateAvailableActions() {
+      if (!gameState || !gameState.players) return;
+      
+      const you = gameState.players.find(p => p.name === "You");
+      if (!you) return;
+      
+      const yourTurn = gameState.turn_index === gameState.players.findIndex(p => p.name === "You");
+      
+      // Can only check if current bet is 0 or we've already matched it
+      checkBtn.disabled = !yourTurn || (gameState.current_bet > 0 && you.current_bet < gameState.current_bet);
+      
+      // Can only call if there's a bet to call and we have chips
+      const canCall = gameState.current_bet > you.current_bet && you.chips > 0;
+      callBtn.disabled = !yourTurn || !canCall;
+      
+      // Can bet/raise if we have chips
+      betBtn.disabled = !yourTurn || you.chips <= 0;
+      
+      // Set minimum bet amount
+      const minBet = Math.max(gameState.current_bet * 2, gameState.big_blind);
+      betAmountInput.min = minBet;
+      betAmountInput.value = minBet;
+      betAmountInput.max = you.chips;
+      
+      // Can fold if there's a bet to call
+      foldBtn.disabled = !yourTurn;
+    }
+    
+    function toggleActionButtons(enabled) {
+      foldBtn.disabled = !enabled;
+      checkBtn.disabled = !enabled;
+      callBtn.disabled = !enabled;
+      betBtn.disabled = !enabled;
+      betAmountInput.disabled = !enabled;
+      
+      if (enabled) {
+        updateAvailableActions();
+      }
+    }
+    
+    function logMessage(message) {
+      const logEntry = document.createElement('div');
+      logEntry.className = 'log-entry';
+      logEntry.textContent = message;
+      gameLogEl.appendChild(logEntry);
+      gameLogEl.scrollTop = gameLogEl.scrollHeight;
+    }
+    
+    async function positionPlayers() {
+      try {
+        const res = await fetch(`${API_BASE}/player_positions`);
+        const positions = await res.json();
+        
+        const tableEl = document.getElementById('pokerTable');
+        const playersContainer = document.getElementById('playersContainer');
+        playersContainer.innerHTML = '';
+        
+        const tableRadius = tableEl.offsetWidth / 2;
+        const playerDistance = tableRadius * 0.8;  // 80% of radius
+        
+        positions.forEach(pos => {
+          const playerEl = document.createElement('div');
+          playerEl.className = `player ${pos.is_bot ? 'bot' : 'human'}`;
+          if (gameState && gameState.turn_index === pos.seat) {
+            playerEl.classList.add('active');
+          }
+          
+          // Convert angle to radians and calculate position
+          const angleRad = (pos.angle * Math.PI) / 180;
+          const left = tableRadius + playerDistance * Math.cos(angleRad);
+          const top = tableRadius + playerDistance * Math.sin(angleRad);
+          
+          playerEl.style.left = `${left}px`;
+          playerEl.style.top = `${top}px`;
+          
+          playerEl.innerHTML = `
+            <h3>${pos.player}</h3>
+            <div class="cards" id="cards-${pos.seat}">
+              <div class="card hidden">??</div>
+              <div class="card hidden">??</div>
+            </div>
+            <div class="player-info">
+              Chips: $${gameState?.players[pos.seat]?.chips || 1000}<br>
+              Bet: $${gameState?.players[pos.seat]?.current_bet || 0}
+            </div>
+          `;
+          
+          playersContainer.appendChild(playerEl);
+        });
+      } catch (error) {
+        console.error('Error positioning players:', error);
+      }
+    }
+    
+    // Initialize the game
+    async function init() {
+      try {
+        const res = await fetch(`${API_BASE}/get_state`);
+        gameState = await res.json();
+        updateUI();
+      } catch (error) {
+        console.error('Error initializing game:', error);
+        logMessage('Error: Could not connect to server. Is it running?');
+      }
+    }
+    
+    init();
   </script>
 </body>
 </html>
