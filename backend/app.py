@@ -51,11 +51,15 @@ def new_hand():
     # Get game state after reset
     state = table.get_state()
     
-    # If first turn is a bot, make the bot move
-    if table.players[table.turn_index].is_bot:
+    # If first turn is a bot, make the bot move automatically
+    bot_actions = []
+    while table.players[table.turn_index].is_bot and not table.round_complete:
         bot_result = table.make_bot_move()
-        state["bot_action"] = bot_result
-        
+        bot_actions.append(bot_result)
+    
+    if bot_actions:
+        state["bot_actions"] = bot_actions
+    
     return jsonify(state)
 
 @app.route('/player_action', methods=['POST'])
@@ -80,6 +84,12 @@ def player_action():
     # If betting round is complete, include that in result
     if table.round_complete:
         result["round_complete"] = True
+        
+        # If only one player remains, advance directly to showdown
+        active_players = [p for p in table.players if not p.folded]
+        if len(active_players) == 1:
+            table.stage = "showdown"
+            result["force_showdown"] = True
     
     return jsonify(result)
 
@@ -99,9 +109,15 @@ def next_stage():
     # Handle showdown separately
     if table.stage == "showdown":
         winner_info = table.award_pot()
+        # Include current chips for all players in response
+        players_info = [{
+            "name": p.name,
+            "chips": p.chips
+        } for p in table.players]
         return jsonify({
             "status": "game_over",
-            "winner": winner_info
+            "winner": winner_info,
+            "players": players_info
         })
     
     # Advance to next stage (flop, turn, river)

@@ -13,11 +13,12 @@ class Table:
         self.stage = "preflop"
         self.small_blind = 25
         self.big_blind = 50
-        self.dealer_index = 0  # rotates each hand
+        self.dealer_index = 0
         self.action_history = []
         self.round_complete = False
         self.active_players = []
         self.last_aggressor = None
+        self.last_winner = None
 
     def deal_player_cards(self):
         for p in self.players:
@@ -37,7 +38,7 @@ class Table:
         player = self.players[self.turn_index]
         result = {"status": "error", "message": "Invalid action"}
 
-        # Record this action
+        # Record action
         self.action_history.append({
             "player": player.name,
             "action": action,
@@ -53,6 +54,8 @@ class Table:
             active_players = [p for p in self.players if not p.folded]
             if len(active_players) == 1:
                 self.stage = "showdown"  # Force showdown with 1 player
+                self.round_complete = True
+                result["force_showdown"] = True
             
         elif action == "check":
             if player.current_bet == self.current_bet:
@@ -131,13 +134,17 @@ class Table:
         self.round_complete = True
     
     def make_bot_move(self):
+        """Handle automated bot decisions"""
         bot = self.players[self.turn_index]
         if not bot.is_bot:
-            return {"status": "not a bot"}
-        
-        # Improved bot strategy based on stage and hand
+            return None
+            
         to_call = self.current_bet - bot.current_bet
         
+        # If bot should fold based on hand strength
+        if bot.should_fold(self.get_state()):
+            return self.handle_player_action("fold", 0)
+            
         # Basic strategy based on shown cards and stage
         if self.stage == "preflop":
             if to_call == 0:  # Can check
@@ -154,7 +161,7 @@ class Table:
                     import random
                     if random.random() < 0.3:
                         bet_amount = min(self.pot // 2, bot.chips)
-                        return self.handle_player_action("bet", bot.current_bet + bet_amount)
+                        return self.handle_player_action("bet", bet_amount)
                 return self.handle_player_action("check", 0)
             elif to_call <= bot.chips // 3:
                 return self.handle_player_action("call", 0)
